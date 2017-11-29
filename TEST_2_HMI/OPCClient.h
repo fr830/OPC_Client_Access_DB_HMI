@@ -12,6 +12,7 @@
 #include <iostream>
 #include <fstream>
 #include "TypesDef.h"
+#include "ItfDB.h"
 
 #pragma comment(lib, "comsuppw.lib")
 
@@ -31,12 +32,14 @@ public:
 	~COPCClient(void);
 	long Connect(long lngInterval);
 	long ReadFromPLC(void);
+	void loop();
 	long WriteToPLC(void);
 	//long ResetData(void);///////////////////////////////////////////////////////TODEL///////
 	long Close(void);
 	char *getPLCStatusMessage(void);
-	void Loop(typRecipe *pRecipe);///////////////////////////////////////////////////////TODEL///////
 	void SetRecipe(typRecipe *pRecipe);
+
+
 private:
 	//PLCThread
 	HANDLE			m_hPLCLoop;
@@ -59,20 +62,19 @@ private:
 
 	//OPC Process
 	IOPCServer		*m_pIOPCServer;
-	IOPCItemMgt		*m_pIOPCItemMgt_Rcv;
-	IOPCSyncIO		*m_pIOPCSyncIO_Rcv;
-	IOPCItemMgt		*m_pIOPCItemMgt_Write;
-	IOPCSyncIO		*m_pIOPCSyncIO_Write;
 
 	OPCITEMDEF		m_ReadItems[READ_ITEMS];
 	OPCITEMRESULT	*m_pReadItemResult;
 	OPCHANDLE		m_RcvGrpSrvHandle;
+	IOPCItemMgt		*m_pIOPCItemMgt_Rcv;
+	IOPCSyncIO		*m_pIOPCSyncIO_Rcv;
+	OPCHANDLE		*m_phServer;
 
 	OPCITEMDEF		m_WriteItems[WRITE_ITEMS];
 	OPCITEMRESULT	*m_pWriteItemResult;
 	OPCHANDLE		m_WriteGrpSrvHandle;
-
-	OPCHANDLE		*m_phServer;
+	IOPCItemMgt		*m_pIOPCItemMgt_Write;
+	IOPCSyncIO		*m_pIOPCSyncIO_Write;
 
 	HRESULT			*m_pRcvErrors;
 	HRESULT			*m_pWriteErrors;
@@ -80,7 +82,9 @@ private:
 	
 	/* Debug File */
 	ofstream fDebugFile;
-
+	ofstream fDebugFileThread;
+	ofstream fDebugFileReadWrite;
+	CItfDB m_cIftDB;
 	/* Recipe Pointer */
 	typRecipe *m_pRecipe;
 };

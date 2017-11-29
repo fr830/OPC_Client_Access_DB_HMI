@@ -156,8 +156,11 @@ HCURSOR CTEST_2_HMIDlg::OnQueryDragIcon()
 
 void CTEST_2_HMIDlg::OnBnClickedButtonStart()
 {
+	m_csSecure.Init();
 	m_cOPCClient.SetRecipe(&m_pRecipe);
-	long ret = m_cOPCClient.Connect(300);
+
+	long ret = m_cOPCClient.Connect(500);
+	m_csSecure.Term();
 	m_EditStatus.SetWindowTextA(m_cOPCClient.getPLCStatusMessage());
 	//m_cOPCClient.Loop(&m_pRecipe);
 	m_EditStatus.SetWindowTextA(m_cOPCClient.getPLCStatusMessage());

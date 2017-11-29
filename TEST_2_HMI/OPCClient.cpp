@@ -12,6 +12,7 @@
 //////////////////////////////////////////////////////////////////////
 COPCClient::COPCClient(void)
 {
+	m_csSecure.Init();	
 }
 
 COPCClient::~COPCClient(void)
@@ -319,34 +320,61 @@ long COPCClient::Connect(long lngInterval)
 
 #ifdef DEBUG_FILE
 	fDebugFile << m_strStatusMessage << endl;
-	fDebugFile.close();
 #endif
 
 	// Reset Exit Thread Condition
 	m_bLoopExit	= false;
 
-	if(ret == S_OK)
-		// New thread for permanent reading and writing from and to PLC
-		m_hPLCLoop = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)PLCThread,this,0,&m_dwPLCLoop);	//start a seperate thread for work!
-	else
-		m_strStatusMessage = "PLC NOT Connected. Parameter bConnectionToPLC is false.\n";
+	// New thread for permanent reading and writing from and to PLC
+	///m_hPLCLoop = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)PLCThread,this,0,&m_dwPLCLoop);	//start a seperate thread for work!
 
 	if(m_hPLCLoop == NULL)
-	{
-		m_strStatusMessage = "Error during Thread creation.\n";
-	}
+		m_strStatusMessage = "Error during Thread creation.";
+	else
+		m_strStatusMessage = "PLC Thread created.";
 
-	static long	lngLastLog = 0;
 	m_bIsRunning = true;
 
 #ifdef DEBUG_FILE
 	fDebugFile << m_strStatusMessage << endl;
 	fDebugFile.close();
 #endif
-
+	loop(); ///TODEL
 	return S_OK;
 }
+void COPCClient::loop()
+{
+	long t1,t2,t3;
+	while(1)
+	{
+		// Stop Thread
+		if( m_bLoopExit )
+		{
+#ifdef DEBUG_FILE
+			fDebugFileThread << "Request stop thread" << endl;
+#endif			//TODELUSDiag(1,'run',"Loop", "Leave RunLoop");
+			return;
+		}
+		//TODELUSDiag( 6, 'sps', "SpsLoop", "count:%d",count++  );
+		t1 = timeGetTime();
+		
+		//PLC RcvData
+		ReadFromPLC();
+		t2 = timeGetTime();
 
+		//Quit bit New Coil
+		if(!m_pRecipe->bNewCoil && m_pRecipe->bAckNewCoil)
+			m_pRecipe->bNewCoil = false;
+
+		//SPS WriteData
+		WriteToPLC();	
+		t3 = timeGetTime();
+
+		// Sleep
+		if(t3-t1<m_lngInterval)
+			Sleep(m_lngInterval-(t3-t1));
+	}
+}
 void COPCClient::SetRecipe(typRecipe *pRecipe)
 {
 	m_pRecipe = pRecipe;
@@ -356,12 +384,14 @@ void COPCClient::PLCThreadWorker()
 {
 	long t1,t2,t3;
 	long count = 0;
-#ifdef DEBUG_FILE
-	fDebugFile.open("test.txt", std::ofstream::out | std::ofstream::app);
-	fDebugFile << "Entered into PLC Thread" << endl;
-#endif
+
 	CoInitializeEx( NULL, COINIT_MULTITHREADED );
-	static long	lngLastLog=0;
+#ifdef DEBUG_FILE
+	fDebugFileThread.open("PLC_thread.txt", std::ofstream::out | std::ofstream::app);
+	fDebugFileThread << "Start PLC Thread..." << endl;
+#endif
+
+
 	//Init of Critical Section
 	m_csSecure.Init();	
 
@@ -376,7 +406,9 @@ void COPCClient::PLCThreadWorker()
 		// Stop Thread
 		if( m_bLoopExit )
 		{
-			//TODELUSDiag(1,'run',"Loop", "Leave RunLoop");
+#ifdef DEBUG_FILE
+			fDebugFileThread << "Request stop thread" << endl;
+#endif			//TODELUSDiag(1,'run',"Loop", "Leave RunLoop");
 			return;
 		}
 		//TODELUSDiag( 6, 'sps', "SpsLoop", "count:%d",count++  );
@@ -400,8 +432,8 @@ void COPCClient::PLCThreadWorker()
 
 	}
 #ifdef DEBUG_FILE
-	fDebugFile << "Stop PLC Thread" << endl;
-	fDebugFile.close();
+	fDebugFileThread << "Stop PLC Thread" << endl;
+	fDebugFileThread.close();
 #endif
 
 	CoUninitialize();
@@ -410,30 +442,37 @@ void COPCClient::PLCThreadWorker()
 /////////////////////////////////////////////////////////////////////////////
 long COPCClient::ReadFromPLC(void)
 {
-	HRESULT			*pErrors = NULL;
-	OPCHANDLE		*phServer = NULL;
-	OPCITEMSTATE	*pItemValue = NULL;
-	HRESULT			ret=0;
-	LPWSTR			ErrorStr = NULL;
+	HRESULT			*pErrors;
+	OPCHANDLE		*phServer;
+	OPCITEMSTATE	*pItemValue;
+	HRESULT			ret = 0;
+	LPWSTR			ErrorStr;
 	long			tstart = 0; //TODELtimeGetTime();
 
-	m_pRecipe->bNewCoil = false; ///////////////////////////////////////////////TODEL/////////////////////////////////////////
+#ifdef DEBUG_FILE
+	fDebugFileReadWrite.open("ReadWrite.txt", std::ofstream::out | std::ofstream::app);
+	fDebugFileReadWrite << "Start Read From PLC" << endl;
+#endif
+
+	//m_pRecipe->bNewCoil = false; ///////////////////////////////////////////////TODEL/////////////////////////////////////////
 	//Memory allocation really needed, if more than one item is to be read
 	phServer = new OPCHANDLE[READ_ITEMS];
 
 	//Select item by server handle, received at AddItem
 	for(int i=0;i < READ_ITEMS;i++)
-	{
-		
-		if (m_pRcvErrors[i] != S_OK)		//Item not available			
+	{		
+		if (m_pRcvErrors[i] != S_OK)		//Item not available
+		{
 			sprintf_s(m_strStatusMessage, 100, "Error : OPC Item [%d] not available", i);
+#ifdef DEBUG_FILE
+			fDebugFileReadWrite << m_strStatusMessage << endl;
+#endif
+		}
 
 		phServer[i] = m_pReadItemResult[i].hServer;
 	}
-
 	// Read Data from OPC Server
 	ret = m_pIOPCSyncIO_Rcv->Read(OPC_DS_DEVICE, READ_ITEMS, phServer, &pItemValue, &pErrors);
-
 	delete[] phServer;
 
 	// If reading is OK
@@ -443,7 +482,12 @@ long COPCClient::ReadFromPLC(void)
 		for(int i=0;i < READ_ITEMS;i++)
 		{
 			if(pItemValue[i].wQuality != OPC_QUALITY_GOOD)
+			{
 				sprintf_s(m_strStatusMessage, 100, "Item-Quality(%d): %d not GOOD", i , pItemValue[i].wQuality);
+#ifdef DEBUG_FILE
+				fDebugFileReadWrite << m_strStatusMessage << endl;
+#endif
+			}
 		}
 		// Affect data values to members
 		if(pItemValue[0].wQuality == OPC_QUALITY_GOOD)
@@ -479,28 +523,30 @@ long COPCClient::ReadFromPLC(void)
 		if(pItemValue[10].wQuality == OPC_QUALITY_GOOD)
 			m_pRecipe->strCassetteName	=	 _com_util::ConvertBSTRToString(pItemValue[10].vDataValue.bstrVal);		
 
-		m_strStatusMessage = "Read from PLC OK";
 #ifdef DEBUG_FILE
-		fDebugFile << m_strStatusMessage << endl;
+		fDebugFileReadWrite << "Read from PLC OK" << endl;
 #endif
 /////////////////////TODEL////////////////////////////////////////////////////////////////////////////////
 		
 		if(m_pRecipe->bNewCoil && !m_pRecipe->bAckNewCoil)
 		{
 			m_pRecipe->bAckNewCoil = true;
+			m_cIftDB.UpdateDB(m_pRecipe);
 #ifdef DEBUG_FILE
-			fDebugFile << "NEW COIL!!" << endl;
-			fDebugFile << m_pRecipe->strOrderName << endl;
-			fDebugFile << m_pRecipe->strCoilNumber << endl;
-			fDebugFile << m_pRecipe->strCustomerName << endl;
-			fDebugFile << m_pRecipe->strNuance << endl;
-			fDebugFile << m_pRecipe->strEtat << endl;
-			fDebugFile << m_pRecipe->lngThickness << endl;
-			fDebugFile << m_pRecipe->lngWidth << endl;
-			fDebugFile << m_pRecipe->lngYieldStrength << endl;
-			fDebugFile << m_pRecipe->strCassetteName << endl;
+			fDebugFileReadWrite << "NEW COIL!!" << endl;
+			fDebugFileReadWrite << m_pRecipe->strOrderName << endl;
+			fDebugFileReadWrite << m_pRecipe->strCoilNumber << endl;
+			fDebugFileReadWrite << m_pRecipe->strCustomerName << endl;
+			fDebugFileReadWrite << m_pRecipe->strNuance << endl;
+			fDebugFileReadWrite << m_pRecipe->strEtat << endl;
+			fDebugFileReadWrite << m_pRecipe->lngThickness << endl;
+			fDebugFileReadWrite << m_pRecipe->lngWidth << endl;
+			fDebugFileReadWrite << m_pRecipe->lngYieldStrength << endl;
+			fDebugFileReadWrite << m_pRecipe->strCassetteName << endl;
 #endif
 		}
+		else
+			m_pRecipe->bAckNewCoil = false;
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 	}
 
@@ -520,6 +566,9 @@ long COPCClient::ReadFromPLC(void)
 	if (FAILED(ret)) 
 	{
 		m_strStatusMessage = "Read failed!";
+#ifdef DEBUG_FILE
+		fDebugFileReadWrite << m_strStatusMessage << endl;
+#endif
 	}
 	else 
 	{		
@@ -530,7 +579,8 @@ long COPCClient::ReadFromPLC(void)
 		CoTaskMemFree(pItemValue);
 	}
 #ifdef DEBUG_FILE
-		fDebugFile << "Read from PLC completed" << endl;
+	fDebugFileReadWrite << "Read from PLC completed" << endl;
+	fDebugFileReadWrite.close();
 #endif
 	return S_OK;
 }
@@ -544,6 +594,10 @@ long COPCClient::WriteToPLC(void)
 	short			INT0=0;
 	VARIANT			vValues[WRITE_ITEMS];
 	
+#ifdef DEBUG_FILE
+	fDebugFileReadWrite.open("ReadWrite.txt", std::ofstream::out | std::ofstream::app);
+	fDebugFileReadWrite << "Start Write to PLC" << endl;
+#endif
 
 	//Select item by server handle, received at AddItem
 	for(int i=0;i < WRITE_ITEMS ;i++)
@@ -591,6 +645,11 @@ long COPCClient::WriteToPLC(void)
 		// Release out-parameters in case of not failed	
 		CoTaskMemFree(pErrors);
 	}
+
+#ifdef DEBUG_FILE
+	fDebugFileReadWrite << "Write to PLC completed" << endl;
+	fDebugFileReadWrite.close();
+#endif
 	return S_OK;
 }
 
@@ -603,6 +662,10 @@ long COPCClient::Close(void)
 
 	m_bIsRunning = false;
 
+#ifdef DEBUG_FILE
+	fDebugFile.open("test.txt", std::ofstream::out | std::ofstream::app);
+	fDebugFile << "Closing connection..." << endl;
+#endif
 	// Stop PLC Loop
 	m_csSecure.Lock();
 		m_bLoopExit = true;
@@ -620,9 +683,13 @@ long COPCClient::Close(void)
 							&pErrors);					//	[out] Errors for each item, returned by OPC server
 	
 	if ( (ret != S_OK) && (ret != S_FALSE) )
+	{
 		m_strStatusMessage = "PLC Disconnection ... RemoveItems failed!";
+#ifdef DEBUG_FILE
+		fDebugFile << m_strStatusMessage << endl;
+#endif
+	}
 
-	
 	if (ret == S_FALSE)
 		m_pIOPCServer->GetErrorString(pErrors[0], LOCALE_ID, &ErrorStr);
 
@@ -640,8 +707,13 @@ long COPCClient::Close(void)
 							&pErrors);					//	[out] Errors for each item, returned by OPC server
 	
 	if ( (ret != S_OK) && (ret != S_FALSE) )
+	{
 		m_strStatusMessage = "PLC Disconnection ... RemoveItems failed!";
-	
+#ifdef DEBUG_FILE
+		fDebugFile << m_strStatusMessage << endl;
+#endif
+	}
+
 	if (ret == S_FALSE)
 	{		
 		m_pIOPCServer->GetErrorString(pErrors[0], LOCALE_ID, &ErrorStr);
@@ -691,7 +763,10 @@ long COPCClient::Close(void)
 	CloseHandle(m_hPLCLoop);
 	m_csSecure.Term();
 	m_strStatusMessage = "PLC Disconnected!";
-
+#ifdef DEBUG_FILE
+	fDebugFile << m_strStatusMessage << endl;
+	fDebugFile.close();
+#endif
 	return S_OK;
 }
 

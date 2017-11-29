@@ -74,7 +74,7 @@ long	CItfDB::UpdateDB(typRecipe *pRecipe)
 			strCalcYield = "1440.0";
 	}
 	else
-		strcpy_s(strCalcYield, 10, ossYield.str().c_str());
+		strCalcYield = "1200"; //strcpy(strCalcYield, ossYield.str().c_str());
 
 
 

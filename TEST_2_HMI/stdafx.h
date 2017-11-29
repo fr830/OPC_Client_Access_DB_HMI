@@ -25,7 +25,8 @@
 #include <ctime>			// To get system date and time
 #include <afxdisp.h>        // MFC Automation classes
 
-
+#include <atlbase.h>
+#include <atlcom.h>
 
 #ifndef _AFX_NO_OLE_SUPPORT
 #include <afxdtctl.h>           // MFC support for Internet Explorer 4 Common Controls
@@ -34,7 +35,17 @@
 #include <afxcmn.h>                     // MFC support for Windows Common Controls
 #endif // _AFX_NO_AFXCMN_SUPPORT
 
-
+class CExeModule : public CComModule
+{
+public:
+	LONG Unlock();
+	DWORD dwThreadID;
+	HANDLE hEventShutdown;
+	void MonitorShutdown();
+    bool StartMonitor();
+    bool bActivity;
+};
+extern CExeModule _Module;
 
 
 

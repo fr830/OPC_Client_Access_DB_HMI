@@ -38,6 +38,9 @@ public:
 	COPCClient m_cOPCClient;
 	CItfDB m_cIftDB;
 
+	//Critical section for the protection of the thread
+	CComCriticalSection	m_csSecure;
+
 
 	CEdit m_EditStatus;
 	CEdit m_EditOrder;
