@@ -111,8 +111,7 @@ long COPCClient::Connect(long lngInterval)
 	szReadItemID[6]  = L"S7:[UMS_SPS]DB852,INT182,1";
 	szReadItemID[7]  = L"S7:[UMS_SPS]DB852,INT184,1";
 	szReadItemID[8]  = L"S7:[UMS_SPS]DB852,DINT186,1";
-	szReadItemID[9]  = L"S7:[UMS_SPS]DB852,INT190,1";
-	szReadItemID[10] = L"S7:[UMS_SPS]DB852,STRING192.20";
+	szReadItemID[9] = L"S7:[UMS_SPS]DB852,STRING192.20";
 
 	for(int i=0;i<READ_ITEMS;i++)
 	{
@@ -240,8 +239,8 @@ long COPCClient::Connect(long lngInterval)
 	LPWSTR			szWriteItemID[WRITE_ITEMS];
 
 	
-	szWriteItemID[0]  = L"S7:[UMS_SPS]DB852,B0,1";	//bits	
-
+	szWriteItemID[0]  = L"S7:[UMS_SPS]DB852,B0,1";	   // Acknowledge New Coil bit	
+	szWriteItemID[1]  = L"S7:[UMS_SPS]DB852,INT190,1"; // Calculated Yield Strength
 	for(int i=0;i<WRITE_ITEMS;i++)
 	{
 		m_WriteItems[i].szAccessPath			= L"";					//	Accesspath not needed
@@ -518,9 +517,6 @@ long COPCClient::ReadFromPLC(void)
 			m_pRecipe->lngEModul			=	(long)pItemValue[8].vDataValue.lVal;
 		
 		if(pItemValue[9].wQuality == OPC_QUALITY_GOOD)
-			m_pRecipe->lngYieldStrength	=	(long)pItemValue[9].vDataValue.lVal;
-
-		if(pItemValue[10].wQuality == OPC_QUALITY_GOOD)
 			m_pRecipe->strCassetteName	=	 _com_util::ConvertBSTRToString(pItemValue[10].vDataValue.bstrVal);		
 
 #ifdef DEBUG_FILE
@@ -541,7 +537,6 @@ long COPCClient::ReadFromPLC(void)
 			fDebugFileReadWrite << m_pRecipe->strEtat << endl;
 			fDebugFileReadWrite << m_pRecipe->lngThickness << endl;
 			fDebugFileReadWrite << m_pRecipe->lngWidth << endl;
-			fDebugFileReadWrite << m_pRecipe->lngYieldStrength << endl;
 			fDebugFileReadWrite << m_pRecipe->strCassetteName << endl;
 #endif
 		}
@@ -622,6 +617,10 @@ long COPCClient::WriteToPLC(void)
 
 	vValues[0].vt		= VT_UI1;
 	vValues[0].uintVal 	= (BYTE)B0; 
+
+	// Calculated Yield Strength
+	vValues[1].vt		= VT_I2;
+	vValues[1].uintVal 	= m_pRecipe->lngYieldStrength;
 
 	ret = m_pIOPCSyncIO_Write->Write(WRITE_ITEMS, m_phServer, vValues, &pErrors);
 

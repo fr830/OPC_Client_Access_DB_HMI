@@ -18,8 +18,8 @@
 
 using namespace std;
 
-#define READ_ITEMS   11
-#define WRITE_ITEMS  1
+#define READ_ITEMS   10
+#define WRITE_ITEMS  2
 
 // Used by GetErrorString; Language code 
 #define LOCALE_ID    0x409	//  ENGLISH

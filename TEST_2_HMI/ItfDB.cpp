@@ -30,6 +30,7 @@ long	CItfDB::UpdateDB(typRecipe *pRecipe)
 {
 	char		*pDBName = NULL;
 	char		*pstrSQL = NULL;
+	char		*strCalcYield = NULL;
 	int			i;
     BSTR        pErrMsg;
 
@@ -42,41 +43,41 @@ long	CItfDB::UpdateDB(typRecipe *pRecipe)
 	ossWidth     << (pRecipe->lngWidth/10.0);
 	ossThickness << (pRecipe->lngThickness/10.0);
 	ossEModule   << (pRecipe->lngEModul/1000.0); // stored in DB as kN/mm2
-	ossYield     << pRecipe->lngYieldStrength;
-	char * strCalcYield = NULL;
+
 	/* Yield Strength Calculation according to table */
 	if (pRecipe->strNuance == "AN42")
 	{
 		if (pRecipe->lngThickness == 0.41)
-			strCalcYield = "1100.0";
+			pRecipe->lngYieldStrength = 1100;
 		else if (pRecipe->lngThickness == 0.44)
-			strCalcYield = "1450.0";
+			pRecipe->lngYieldStrength = 1450;
 		else if (pRecipe->lngThickness == 0.49)
-			strCalcYield = "320.0";
+			pRecipe->lngYieldStrength = 320;
 		else if (pRecipe->lngThickness == 0.51)
-			strCalcYield = "1100.0";
+			pRecipe->lngYieldStrength = 1100;
 		else if (pRecipe->lngThickness == 0.61)
-			strCalcYield = "840.0";
+			pRecipe->lngYieldStrength = 840;
 		else if (pRecipe->lngThickness >= 0.71)
-			strCalcYield = "1100.0";
+			pRecipe->lngYieldStrength = 1100;
 	}
 	else if (pRecipe->strNuance == "DS21")
-			strCalcYield = "1080.0";
+			pRecipe->lngYieldStrength = 1080;
 	else if (pRecipe->strNuance == "MD30")
-			strCalcYield = "1000.0";
-	else if (pRecipe->strNuance == "MS20")
-			strCalcYield = "1400.0";
+			pRecipe->lngYieldStrength = 1000;
 	else if (pRecipe->strNuance == "MS30")
+			pRecipe->lngYieldStrength = 1400;
+	else if (pRecipe->strNuance == "MS20")
 	{
 		if(pRecipe->lngThickness == 0.8)
-			strCalcYield = "1400.0";
+			pRecipe->lngYieldStrength = 1400;
 		else if (pRecipe->lngThickness >= 1.2)
-			strCalcYield = "1440.0";
+			pRecipe->lngYieldStrength = 1440;
 	}
 	else
-		strCalcYield = "1200"; //strcpy(strCalcYield, ossYield.str().c_str());
+		pRecipe->lngYieldStrength = 1200;
 
-
+	ossYield << pRecipe->lngYieldStrength;
+	strcpy_s(strCalcYield,  50, ossYield.str().c_str());
 
 	/* Update tblAuftrag Table */
 
@@ -138,7 +139,7 @@ long	CItfDB::UpdateDB(typRecipe *pRecipe)
 	strcpy_s (DBName (1), MAX_COL_LENGTH, "dblEModul = ");
 	strcpy_s (DBName (2), MAX_COL_LENGTH, ossEModule.str().c_str());
 	strcpy_s (DBName (3), MAX_COL_LENGTH, ", dblStreckgrenze = ");
-	strcpy_s (DBName (4), MAX_COL_LENGTH, strCalcYield);  //ossYield.str().c_str());
+	strcpy_s (DBName (4), MAX_COL_LENGTH, strCalcYield);
 	for(i = 0; i <= 4; i++)
 		strcat_s(pstrSQL, MAX_COL_LENGTH*5, DBName(i));
 
